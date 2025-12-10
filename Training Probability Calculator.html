@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Training Probability Calculator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;700&display=swap');
+        body { font-family: 'Noto Sans', sans-serif; }
+        .stat-card { transition: all 0.2s; }
+        .stat-card:focus-within { 
+            transform: translateY(-2px); 
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5), 0 2px 4px -1px rgba(0, 0, 0, 0.3); 
+            border-color: #3b82f6; 
+        }
+        
+        input[type=number]::-webkit-outer-spin-button,
+        input[type=number]::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        input[type=number] {
+            -moz-appearance: textfield;
+        }
+
+        /* Mode Button Styles */
+        .mode-btn.active {
+            background-color: #3b82f6; /* blue-500 */
+            color: white;
+            border-color: #3b82f6;
+        }
+        .mode-btn {
+            background-color: #1e293b; /* slate-800 */
+            color: #94a3b8; /* slate-400 */
+            border-color: #334155; /* slate-700 */
+        }
+        .mode-btn:hover:not(.active) {
+            background-color: #334155;
+        }
+    </style>
+</head>
+<body class="bg-slate-900 min-h-screen flex items-center justify-center p-4 text-slate-200">
+
+    <div class="bg-slate-800 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-slate-700">
+        <!-- Header -->
+        <div class="bg-slate-950 p-6 pb-4 text-white text-center border-b border-slate-700">
+            <h1 class="text-2xl font-bold mb-4 text-blue-400">Training Probability Calculator</h1>
+            
+            <!-- Mode Toggles -->
+            <div class="flex justify-center space-x-2">
+                <button onclick="setMode('standard')" id="btn-standard" class="mode-btn active px-4 py-2 rounded-lg font-bold text-sm border transition-colors duration-200">
+                    Standard
+                </button>
+                <button onclick="setMode('supreme')" id="btn-supreme" class="mode-btn px-4 py-2 rounded-lg font-bold text-sm border transition-colors duration-200">
+                    Supreme
+                </button>
+            </div>
+        </div>
+
+        <!-- Form -->
+        <div class="p-6 space-y-4">
+            <!-- Instruction Text: Removed global white color to allow highlighting -->
+            <p class="text-sm text-slate-400 mb-4 text-center" id="instruction-text">
+                Enter <span class="font-bold text-slate-200">Desired</span> Value
+            </p>
+
+            <!-- Inputs Grid -->
+            <div class="space-y-3">
+                <!-- Header for Columns -->
+                <!-- Removed 'hidden' class so it defaults to visible (JS manages specific columns) -->
+                <div id="column-headers" class="flex px-3 text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">
+                    <div class="w-1/3 text-left pl-2">STAT</div>
+                    <div id="header-lv20" class="w-16 text-center mr-2 hidden">LV.20</div>
+                    <div class="flex-1 text-center">DESIRED</div>
+                </div>
+
+                <!-- Row 1 -->
+                <div class="stat-card flex items-center justify-between bg-slate-700/50 p-3 rounded-lg border border-slate-600">
+                    <label class="font-bold text-slate-200 w-1/3 pl-2 text-sm sm:text-base">CON / LOC</label>
+                    
+                    <!-- Original Value Input (Hidden in Standard) -->
+                    <input type="number" id="orig_a" value="0" placeholder="Lv.20" class="supreme-input hidden w-16 h-10 bg-slate-800 border border-slate-600 rounded text-center font-mono text-lg text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 mr-2">
+                    
+                    <!-- Desired/Limit Value Input -->
+                    <div class="flex items-center space-x-1 flex-1 justify-center">
+                        <button onclick="adjustValue('val_a', -1)" class="w-10 h-10 rounded-l-lg bg-slate-600 hover:bg-slate-500 text-white font-bold transition active:bg-slate-700 border-r border-slate-500">-</button>
+                        <input type="number" id="val_a" value="0" min="0" max="150" class="w-16 h-10 bg-slate-800 text-center font-mono text-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-slate-500 border-y border-slate-600">
+                        <button onclick="adjustValue('val_a', 1)" class="w-10 h-10 rounded-r-lg bg-slate-600 hover:bg-slate-500 text-white font-bold transition active:bg-slate-700 border-l border-slate-500">+</button>
+                    </div>
+                </div>
+
+                <!-- Row 2 -->
+                <div class="stat-card flex items-center justify-between bg-slate-700/50 p-3 rounded-lg border border-slate-600">
+                    <label class="font-bold text-slate-200 w-1/3 pl-2 text-sm sm:text-base">POW / VEL</label>
+                    <input type="number" id="orig_b" value="0" placeholder="Lv.20" class="supreme-input hidden w-16 h-10 bg-slate-800 border border-slate-600 rounded text-center font-mono text-lg text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 mr-2">
+                    <div class="flex items-center space-x-1 flex-1 justify-center">
+                        <button onclick="adjustValue('val_b', -1)" class="w-10 h-10 rounded-l-lg bg-slate-600 hover:bg-slate-500 text-white font-bold transition active:bg-slate-700 border-r border-slate-500">-</button>
+                        <input type="number" id="val_b" value="0" min="0" max="150" class="w-16 h-10 bg-slate-800 text-center font-mono text-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-slate-500 border-y border-slate-600">
+                        <button onclick="adjustValue('val_b', 1)" class="w-10 h-10 rounded-r-lg bg-slate-600 hover:bg-slate-500 text-white font-bold transition active:bg-slate-700 border-l border-slate-500">+</button>
+                    </div>
+                </div>
+
+                <!-- Row 3 -->
+                <div class="stat-card flex items-center justify-between bg-slate-700/50 p-3 rounded-lg border border-slate-600">
+                    <label class="font-bold text-slate-200 w-1/3 pl-2 text-sm sm:text-base">EYE / STA</label>
+                    <input type="number" id="orig_c" value="0" placeholder="Lv.20" class="supreme-input hidden w-16 h-10 bg-slate-800 border border-slate-600 rounded text-center font-mono text-lg text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 mr-2">
+                    <div class="flex items-center space-x-1 flex-1 justify-center">
+                        <button onclick="adjustValue('val_c', -1)" class="w-10 h-10 rounded-l-lg bg-slate-600 hover:bg-slate-500 text-white font-bold transition active:bg-slate-700 border-r border-slate-500">-</button>
+                        <input type="number" id="val_c" value="0" min="0" max="150" class="w-16 h-10 bg-slate-800 text-center font-mono text-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-slate-500 border-y border-slate-600">
+                        <button onclick="adjustValue('val_c', 1)" class="w-10 h-10 rounded-r-lg bg-slate-600 hover:bg-slate-500 text-white font-bold transition active:bg-slate-700 border-l border-slate-500">+</button>
+                    </div>
+                </div>
+
+                <!-- Row 4 -->
+                <div class="stat-card flex items-center justify-between bg-slate-700/50 p-3 rounded-lg border border-slate-600">
+                    <label class="font-bold text-slate-200 w-1/3 pl-2 text-sm sm:text-base">SPD / FB</label>
+                    <input type="number" id="orig_d" value="0" placeholder="Lv.20" class="supreme-input hidden w-16 h-10 bg-slate-800 border border-slate-600 rounded text-center font-mono text-lg text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 mr-2">
+                    <div class="flex items-center space-x-1 flex-1 justify-center">
+                        <button onclick="adjustValue('val_d', -1)" class="w-10 h-10 rounded-l-lg bg-slate-600 hover:bg-slate-500 text-white font-bold transition active:bg-slate-700 border-r border-slate-500">-</button>
+                        <input type="number" id="val_d" value="0" min="0" max="150" class="w-16 h-10 bg-slate-800 text-center font-mono text-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-slate-500 border-y border-slate-600">
+                        <button onclick="adjustValue('val_d', 1)" class="w-10 h-10 rounded-r-lg bg-slate-600 hover:bg-slate-500 text-white font-bold transition active:bg-slate-700 border-l border-slate-500">+</button>
+                    </div>
+                </div>
+
+                <!-- Row 5 -->
+                <div class="stat-card flex items-center justify-between bg-slate-700/50 p-3 rounded-lg border border-slate-600">
+                    <label class="font-bold text-slate-200 w-1/3 pl-2 text-sm sm:text-base">FLD / BRK</label>
+                    <input type="number" id="orig_e" value="0" placeholder="Lv.20" class="supreme-input hidden w-16 h-10 bg-slate-800 border border-slate-600 rounded text-center font-mono text-lg text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 mr-2">
+                    <div class="flex items-center space-x-1 flex-1 justify-center">
+                        <button onclick="adjustValue('val_e', -1)" class="w-10 h-10 rounded-l-lg bg-slate-600 hover:bg-slate-500 text-white font-bold transition active:bg-slate-700 border-r border-slate-500">-</button>
+                        <input type="number" id="val_e" value="0" min="0" max="150" class="w-16 h-10 bg-slate-800 text-center font-mono text-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-slate-500 border-y border-slate-600">
+                        <button onclick="adjustValue('val_e', 1)" class="w-10 h-10 rounded-r-lg bg-slate-600 hover:bg-slate-500 text-white font-bold transition active:bg-slate-700 border-l border-slate-500">+</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Calculate Button -->
+            <button onclick="calculateProbability()" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-4 rounded-lg transition duration-200 mt-6 shadow-lg shadow-blue-900/50 active:transform active:scale-95 border border-blue-500">
+                Calculate Probability
+            </button>
+
+            <!-- Result Section -->
+            <div id="result-area" class="hidden mt-6 bg-slate-900 rounded-lg p-5 text-center text-white relative overflow-hidden border border-slate-700 shadow-inner">
+                <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-green-400 to-blue-500"></div>
+                <p class="text-slate-400 text-xs uppercase tracking-wider mb-1">Estimated Probability</p>
+                <div class="text-4xl font-mono font-bold text-green-400 drop-shadow-md" id="probability-display">0.00%</div>
+                <p id="result-subtext" class="text-slate-500 text-xs mt-2 italic">Based on Multinomial Distribution</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentMode = 'standard';
+        const MAX_POINTS_DP = 100; // Precompute up to reasonable max (Std=48, Supreme=30, Buffer=100)
+
+        // Precompute factorials
+        const factorials = new Float64Array(MAX_POINTS_DP + 1);
+        factorials[0] = 1;
+        for (let i = 1; i <= MAX_POINTS_DP; i++) {
+            factorials[i] = factorials[i - 1] * i;
+        }
+
+        function setMode(mode) {
+            currentMode = mode;
+            
+            // UI Toggle
+            const btnStd = document.getElementById('btn-standard');
+            const btnSup = document.getElementById('btn-supreme');
+            const origInputs = document.querySelectorAll('.supreme-input');
+            const colHeaders = document.getElementById('column-headers');
+            const headerLv20 = document.getElementById('header-lv20'); // New ID
+            const instruction = document.getElementById('instruction-text');
+            const resultArea = document.getElementById('result-area');
+
+            // Hide results when switching
+            resultArea.classList.add('hidden');
+
+            if (mode === 'standard') {
+                btnStd.classList.add('active');
+                btnSup.classList.remove('active');
+                origInputs.forEach(el => el.classList.add('hidden'));
+                
+                // Show Header Row, but Hide LV.20 column
+                colHeaders.classList.remove('hidden');
+                headerLv20.classList.add('hidden');
+                
+                instruction.innerHTML = 'Enter <span class="font-bold text-slate-200">Desired</span> Value';
+            } else {
+                btnSup.classList.add('active');
+                btnStd.classList.remove('active');
+                origInputs.forEach(el => el.classList.remove('hidden'));
+                
+                // Show Header Row AND Show LV.20 column
+                colHeaders.classList.remove('hidden');
+                headerLv20.classList.remove('hidden');
+                
+                instruction.innerHTML = 'Enter <span class="font-bold text-slate-200">Lv.20</span> & <span class="font-bold text-slate-200">Desired</span> Values';
+            }
+        }
+
+        function adjustValue(id, delta) {
+            const input = document.getElementById(id);
+            let val = parseInt(input.value) || 0;
+            val += delta;
+            
+            // Allow wider range
+            if (val < 0) val = 0;
+            if (val > 150) val = 150;
+            
+            input.value = val;
+        }
+
+        function calculateProbability() {
+            const resultArea = document.getElementById('result-area');
+            const displayEl = document.getElementById('probability-display');
+            const subtextEl = document.getElementById('result-subtext');
+            
+            // Helper to set error
+            const setError = (msg, subMsg) => {
+                displayEl.classList.remove('text-green-400', 'text-yellow-400', 'text-red-400', 'text-red-500');
+                displayEl.classList.add('text-red-500');
+                displayEl.innerText = msg;
+                subtextEl.innerText = subMsg;
+                subtextEl.classList.remove('text-slate-500');
+                subtextEl.classList.add('text-red-400');
+                resultArea.classList.remove('hidden');
+                resultArea.classList.add('animate-pulse');
+                setTimeout(() => resultArea.classList.remove('animate-pulse'), 500);
+            }
+
+            // --- STANDARD MODE ---
+            if (currentMode === 'standard') {
+                const TOTAL_POINTS = 48;
+                const limits = [
+                    parseInt(document.getElementById('val_a').value) || 0,
+                    parseInt(document.getElementById('val_b').value) || 0,
+                    parseInt(document.getElementById('val_c').value) || 0,
+                    parseInt(document.getElementById('val_d').value) || 0,
+                    parseInt(document.getElementById('val_e').value) || 0
+                ];
+
+                const sumLimits = limits.reduce((a, b) => a + b, 0);
+
+                if (sumLimits < 48 || sumLimits > 57) {
+                    setError("Invalid Sum", `Sum of limits is ${sumLimits}. Must be between 48 and 57.`);
+                    return;
+                }
+
+                const prob = runDP(TOTAL_POINTS, limits);
+                showSuccess(prob, `Standard Mode (n=${TOTAL_POINTS})`);
+            } 
+            
+            // --- SUPREME MODE ---
+            else {
+                const origs = [
+                    parseInt(document.getElementById('orig_a').value) || 0,
+                    parseInt(document.getElementById('orig_b').value) || 0,
+                    parseInt(document.getElementById('orig_c').value) || 0,
+                    parseInt(document.getElementById('orig_d').value) || 0,
+                    parseInt(document.getElementById('orig_e').value) || 0
+                ];
+
+                const desireds = [
+                    parseInt(document.getElementById('val_a').value) || 0,
+                    parseInt(document.getElementById('val_b').value) || 0,
+                    parseInt(document.getElementById('val_c').value) || 0,
+                    parseInt(document.getElementById('val_d').value) || 0,
+                    parseInt(document.getElementById('val_e').value) || 0
+                ];
+
+                const sumOrig = origs.reduce((a, b) => a + b, 0);
+                const sumDesired = desireds.reduce((a, b) => a + b, 0);
+
+                if (sumOrig !== 57) {
+                    setError("Lv.20 Sum Error", `Sum of Lv.20 Values is ${sumOrig}. Must be exactly 57.`);
+                    return;
+                }
+
+                if (sumDesired < 81 || sumDesired > 87) {
+                    setError("Desired Sum Error", `Sum of Desired Values is ${sumDesired}. Must be between 81 and 87.`);
+                    return;
+                }
+
+                // Points to distribute
+                const N = sumDesired - sumOrig;
+                
+                // Calculate limits for the delta (Desired - Orig)
+                const limits = [];
+                for(let i=0; i<5; i++) {
+                    const delta = desireds[i] - origs[i];
+                    if (delta < 0) {
+                        setError("Invalid Target", `Desired value cannot be lower than Lv.20 value.`);
+                        return;
+                    }
+                    limits.push(delta);
+                }
+
+                const prob = runDP(N, limits);
+                showSuccess(prob, `Supreme Mode (Points Added: ${N})`);
+            }
+        }
+
+        // Generic DP Logic
+        function runDP(totalPoints, limits) {
+            // dp[s] stores the sum of (1 / product of factorials) for partial sum s
+            let dp = new Float64Array(totalPoints + 1).fill(0);
+            dp[0] = 1; // Base case: 1 / 0! = 1
+
+            for (let i = 0; i < 5; i++) {
+                const limit = limits[i];
+                const nextDp = new Float64Array(totalPoints + 1).fill(0);
+
+                for (let currentSum = 0; currentSum <= totalPoints; currentSum++) {
+                    if (dp[currentSum] === 0) continue;
+
+                    // Try adding 'k' points to current stat, where 0 <= k <= limit
+                    for (let k = 0; k <= limit; k++) {
+                        if (currentSum + k <= totalPoints) {
+                            nextDp[currentSum + k] += dp[currentSum] / factorials[k];
+                        }
+                    }
+                }
+                dp = nextDp;
+            }
+
+            const sumOfInverseFactorials = dp[totalPoints];
+            const multinomialSum = sumOfInverseFactorials * factorials[totalPoints];
+            
+            // Probability = MultinomialSum * (1/5)^N
+            return multinomialSum * Math.pow(0.2, totalPoints);
+        }
+
+        function showSuccess(probability, subText) {
+            const percentage = probability * 100;
+            const displayEl = document.getElementById('probability-display');
+            const subtextEl = document.getElementById('result-subtext');
+            const resultArea = document.getElementById('result-area');
+
+            let displayString = "";
+            if (percentage === 0) {
+                displayString = "0%";
+            } else if (percentage < 0.0001) {
+                displayString = percentage.toExponential(4) + "%";
+            } else {
+                displayString = percentage.toFixed(4) + "%";
+            }
+
+            displayEl.innerText = displayString;
+            subtextEl.innerText = subText;
+            
+            // Reset styles
+            subtextEl.className = "text-slate-500 text-xs mt-2 italic";
+            displayEl.classList.remove('text-green-400', 'text-yellow-400', 'text-red-400', 'text-red-500');
+
+            if (percentage < 0.5) {
+                displayEl.classList.add('text-red-400');
+            } else if (percentage < 1) {
+                displayEl.classList.add('text-yellow-400');
+            } else {
+                displayEl.classList.add('text-green-400');
+            }
+
+            resultArea.classList.remove('hidden');
+            resultArea.classList.add('animate-pulse');
+            setTimeout(() => resultArea.classList.remove('animate-pulse'), 500);
+        }
+    </script>
+</body>
+</html>
