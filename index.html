@@ -5,14 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Miruru's MLB : 9 Innings Tools</title>
     
-    <!-- React & ReactDOM (網頁的核心引擎) -->
+    <!-- React & ReactDOM -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     
-    <!-- Babel (翻譯機，將 React 程式碼轉為瀏覽器懂的語言) -->
+    <!-- Babel for JSX -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     
-    <!-- Tailwind CSS (樣式設計) -->
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -56,11 +56,10 @@
 <body>
     <div id="root"></div>
 
-    <!-- 這裡 type="text/babel" 非常重要，它告訴瀏覽器這段是 React 程式碼 -->
     <script type="text/babel">
-        const { useState, useEffect } = React;
+        const { useState, useEffect, useRef, useMemo } = React;
 
-        // --- Icons Components (Replacing lucide-react for single file portability) ---
+        // --- Icons Components ---
         const IconBase = ({ children, className, ...props }) => (
             <svg 
                 xmlns="http://www.w3.org/2000/svg" 
@@ -84,93 +83,128 @@
         const History = (props) => <IconBase {...props}><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 12"/><path d="M3 3v9h9"/><path d="M12 7v5l4 2"/></IconBase>;
         const ChevronLeft = (props) => <IconBase {...props}><path d="m15 18-6-6 6-6"/></IconBase>;
         const ChevronRight = (props) => <IconBase {...props}><path d="m9 18 6-6-6-6"/></IconBase>;
+        const ChevronDown = (props) => <IconBase {...props}><path d="m6 9 6 6 6-6"/></IconBase>;
         const Sun = (props) => <IconBase {...props}><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></IconBase>;
         const Moon = (props) => <IconBase {...props}><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></IconBase>;
         const Globe = (props) => <IconBase {...props}><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></IconBase>;
         const CheckCircle2 = (props) => <IconBase {...props}><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></IconBase>;
         const Circle = (props) => <IconBase {...props}><circle cx="12" cy="12" r="10"/></IconBase>;
-        const Timer = (props) => <IconBase {...props}><line x1="10" y1="2" x2="14" y2="2"/><line x1="12" y1="14" x2="15" y2="11"/><circle cx="12" cy="14" r="8"/></IconBase>;
+        const Lock = (props) => <IconBase {...props}><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></IconBase>;
+        const Gift = (props) => <IconBase {...props}><rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13"/><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7"/><path d="M7.5 8a2.5 2.5 0 0 1 0-5A4.8 8 0 0 1 12 8a4.8 8 0 0 1 4.5-5 2.5 2.5 0 0 1 0 5"/></IconBase>;
+        
+        // --- Storage Key ---
+        const STORAGE_KEY = 'miruru_data_v1';
 
         // --- Main App Component ---
         const App = () => {
-            // --- State Initialization (LocalStorage) ---
-            const [isDark, setIsDark] = useState(() => {
-                if (typeof window !== 'undefined') {
-                    const saved = localStorage.getItem('miruru_isDark');
-                    return saved !== null ? JSON.parse(saved) : true;
-                }
-                return true;
-            });
             
-            const [lang, setLang] = useState(() => {
-                if (typeof window !== 'undefined') {
-                    return localStorage.getItem('miruru_lang') || 'en';
-                }
-                return 'en';
-            });
-
-            const [startDate, setStartDate] = useState(() => {
-                if (typeof window !== 'undefined') {
-                    return localStorage.getItem('miruru_startDate') || '';
-                }
-                return '';
-            });
-
-            const [timeZoneOffset, setTimeZoneOffset] = useState(() => {
-                if (typeof window !== 'undefined') {
-                    const saved = localStorage.getItem('miruru_timeZoneOffset');
-                    return saved ? parseInt(saved, 10) : -5;
-                }
-                return -5;
-            });
-
-            const [routineState, setRoutineState] = useState(() => {
-                if (typeof window !== 'undefined') {
-                    const saved = localStorage.getItem('miruru_routineState');
-                    try {
-                        return saved ? JSON.parse(saved) : {};
-                    } catch {
-                        return {};
+            // 1. Data Loader & Migration Logic
+            const loadInitialData = () => {
+                try {
+                    // Try new unified format first
+                    const saved = localStorage.getItem(STORAGE_KEY);
+                    if (saved) {
+                        return JSON.parse(saved);
                     }
-                }
-                return {};
-            });
 
-            const [fullBallsTime, setFullBallsTime] = useState(() => {
-                if (typeof window !== 'undefined') {
-                    return localStorage.getItem('miruru_fullBallsTime') || '';
+                    // Fallback: Migration from Legacy Keys
+                    const legacy = {
+                        isDark: JSON.parse(localStorage.getItem('miruru_isDark') ?? 'true'),
+                        lang: localStorage.getItem('miruru_lang') || 'en',
+                        startDate: localStorage.getItem('miruru_startDate') || '',
+                        timeZoneOffset: parseInt(localStorage.getItem('miruru_timeZoneOffset') || '-5'),
+                        routineState: JSON.parse(localStorage.getItem('miruru_routineState') || '{}'),
+                        isAccountTrackerOpen: JSON.parse(localStorage.getItem('miruru_isAccountTrackerOpen') ?? 'true'),
+                        isRoutineCheckerOpen: JSON.parse(localStorage.getItem('miruru_isRoutineCheckerOpen') ?? 'true'),
+                        lastRoutineDate: localStorage.getItem('miruru_lastRoutineDate') || ''
+                    };
+                    return legacy;
+
+                } catch (e) {
+                    console.error("Data Load Error:", e);
+                    // Default Fallback
+                    return {
+                        isDark: true,
+                        lang: 'en',
+                        startDate: '',
+                        timeZoneOffset: -5,
+                        routineState: {},
+                        isAccountTrackerOpen: true,
+                        isRoutineCheckerOpen: true,
+                        lastRoutineDate: ''
+                    };
                 }
-                return '';
-            });
+            };
+
+            const [data, setData] = useState(loadInitialData);
+
+            // 2. Destructure State for easier usage, linked to single source
+            // We use individual state setters to trigger re-renders, but will sync back to a master object
+            const [isDark, setIsDark] = useState(data.isDark);
+            const [lang, setLang] = useState(data.lang);
+            const [startDate, setStartDate] = useState(data.startDate);
+            const [timeZoneOffset, setTimeZoneOffset] = useState(data.timeZoneOffset);
+            const [routineState, setRoutineState] = useState(data.routineState);
+            const [isAccountTrackerOpen, setIsAccountTrackerOpen] = useState(data.isAccountTrackerOpen);
+            const [isRoutineCheckerOpen, setIsRoutineCheckerOpen] = useState(data.isRoutineCheckerOpen);
+            const [lastRoutineDate, setLastRoutineDate] = useState(data.lastRoutineDate);
 
             const [currentTime, setCurrentTime] = useState(new Date());
             const [stats, setStats] = useState(null);
 
-            // --- Persistence Effects ---
-            useEffect(() => { localStorage.setItem('miruru_isDark', JSON.stringify(isDark)); }, [isDark]);
-            useEffect(() => { localStorage.setItem('miruru_lang', lang); }, [lang]);
-            useEffect(() => { localStorage.setItem('miruru_startDate', startDate); }, [startDate]);
-            useEffect(() => { localStorage.setItem('miruru_timeZoneOffset', timeZoneOffset.toString()); }, [timeZoneOffset]);
-            useEffect(() => { localStorage.setItem('miruru_routineState', JSON.stringify(routineState)); }, [routineState]);
-            useEffect(() => { localStorage.setItem('miruru_fullBallsTime', fullBallsTime); }, [fullBallsTime]);
+            // 3. Consolidated Persistence Effect (Debounced)
+            useEffect(() => {
+                const timer = setTimeout(() => {
+                    const dataToSave = {
+                        isDark,
+                        lang,
+                        startDate,
+                        timeZoneOffset,
+                        routineState,
+                        isAccountTrackerOpen,
+                        isRoutineCheckerOpen,
+                        lastRoutineDate
+                    };
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify(dataToSave));
+                }, 500); // 500ms debounce
+
+                return () => clearTimeout(timer);
+            }, [isDark, lang, startDate, timeZoneOffset, routineState, isAccountTrackerOpen, isRoutineCheckerOpen, lastRoutineDate]);
+
 
             // --- Logic & Helpers ---
             const [isPickerOpen, setIsPickerOpen] = useState(false);
             const [pickerYear, setPickerYear] = useState(new Date().getFullYear());
             const [pickerMonth, setPickerMonth] = useState(new Date().getMonth());
+            const [isTimeZoneOpen, setIsTimeZoneOpen] = useState(false);
+            const timeZoneRef = useRef(null);
 
-            const [isTimePickerOpen, setIsTimePickerOpen] = useState(false);
-            const [pickerHour, setPickerHour] = useState(new Date().getHours());
-            const [pickerMinute, setPickerMinute] = useState(new Date().getMinutes());
+            // Helper to get Server Date Object (shifted)
+            const getServerDateObj = (nowDate, offset) => {
+                const serverTimeMs = nowDate.getTime() + (offset * 3600000);
+                return new Date(serverTimeMs);
+            };
+
+            // --- Click Outside Handlers ---
+            useEffect(() => {
+                const handleClickOutside = (event) => {
+                    if (timeZoneRef.current && !timeZoneRef.current.contains(event.target)) {
+                        setIsTimeZoneOpen(false);
+                    }
+                };
+                document.addEventListener('mousedown', handleClickOutside);
+                return () => document.removeEventListener('mousedown', handleClickOutside);
+            }, []);
 
             const t = {
                 en: {
                     title: "Miruru's MLB : 9 Innings Tools",
                     currentTime: "Current Time",
+                    serverTime: "Server Time",
                     accountTracker: "Account Age Tracker",
                     creationDate: "Account Creation Date (Server Date)",
                     gameTimeZone: "In-game Time Zone",
-                    selectDate: "Select a date to calculate your total playtime.",
+                    selectDate: "Select the date your account was created.",
                     year: "Year", years: "Years",
                     month: "Month", months: "Months",
                     week: "Week", weeks: "Weeks",
@@ -180,39 +214,35 @@
                     monthsShort: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
                     monthsLong: ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],
                     weekDays: ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'],
-                    regions: {
-                        americas: "America (UTC-5)",
-                        europe: "Europe (UTC+1)",
-                        asia: "Asia (UTC+9)"
-                    },
+                    regions: { '-5': "America (UTC-5)", '1': "Europe (UTC+1)", '9': "Asia (UTC+9)" },
                     routine: {
                         title: "Routine Checker",
-                        fullBallsTime: "Desired Full-Balls Time",
-                        selectTime: "Set Time",
-                        league: "League Mode",
-                        leaguePlay: "League Mode",
-                        battle: "Battle Mode",
-                        ranked: "Ranked Battle",
-                        friend: "Friend Battle",
-                        special: "Special Mode",
-                        career: "Career Mode",
-                        stage: "Stage Challenge",
-                        arcade: "Arcade Mode",
-                        clutch: "Clutch Hits Mode",
-                        club: "Club",
-                        clubBattle: "Club Battle",
-                        clubChallenge: "Club Challenge"
+                        league: "League Mode", leaguePlay: "League Mode",
+                        battle: "Battle Mode", ranked: "Ranked Battle", friend: "Friend Battle", pvp: "PVP",
+                        special: "Special Mode", career: "Career Mode", stage: "Stage Challenge", arcade: "Arcade Mode", clutch: "Clutch Hits Mode",
+                        club: "Club", clubClosed: "(Closed)", clubBattle: "Club Battle", clubChallenge: "Club Challenge", 
+                        rewardAvailableDay: "REWARD AVAILABLE DAY",
+                        claimRewardHint: "Open the game to claim your rewards!",
+                        misc: "Miscellaneous",
+                        allMissions: "All Missions & Activities Completed",
+                        friendPoints: "FP Collected & Sent",
+                        clubCrafting: "Club Crafting & Exchange",
+                        specialShop: "Special Shop Exchange",
+                        weeklyBox: "Weekly Mission Box Opened",
+                        ovrAnalysis: "OVR Analysis Room",
+                        completed: "COMPLETED"
                     }
                 },
                 zh: {
-                    title: "Miruru's MLB : 9 Innings 工具",
+                    title: "Miruru 的 MLB 9局職棒工具",
                     currentTime: "當前時間",
-                    accountTracker: "帳號年資追蹤器",
+                    serverTime: "伺服器時間",
+                    accountTracker: "帳號年齡追蹤",
                     creationDate: "帳號創建日期 (伺服器日期)",
                     gameTimeZone: "遊戲內時區",
-                    selectDate: "請選擇日期以計算總遊玩時間",
+                    selectDate: "請選擇你的帳號創建日期",
                     year: "年", years: "年",
-                    month: "個月", months: "個月",
+                    month: "月", months: "月",
                     week: "週", weeks: "週",
                     day: "天", days: "天",
                     total: "總計",
@@ -220,49 +250,208 @@
                     monthsShort: ["1月", "2月", "3月", "4月", "5月", "6月", "7月", "8月", "9月", "10月", "11月", "12月"],
                     monthsLong: ["一月", "二月", "三月", "四月", "五月", "六月", "七月", "八月", "九月", "十月", "十一月", "十二月"],
                     weekDays: ['日', '一', '二', '三', '四', '五', '六'],
-                    regions: {
-                        americas: "美洲 (UTC-5)",
-                        europe: "歐洲 (UTC+1)",
-                        asia: "亞洲 (UTC+9)"
-                    },
+                    regions: { '-5': "美洲 (UTC-5)", '1': "歐洲 (UTC+1)", '9': "亞洲 (UTC+9)" },
                     routine: {
-                        title: "每日例行檢查",
-                        fullBallsTime: "預定滿球時間",
-                        selectTime: "設定時間",
-                        league: "聯賽模式",
-                        leaguePlay: "聯賽模式",
-                        battle: "對戰模式",
-                        ranked: "排名戰",
-                        friend: "好友對戰",
-                        special: "特別模式",
-                        career: "職業模式",
-                        stage: "關卡挑戰",
-                        arcade: "競技模式",
-                        clutch: "打點模式",
-                        club: "俱樂部",
-                        clubBattle: "俱樂部戰",
-                        clubChallenge: "俱樂部挑戰"
+                        title: "日程檢查",
+                        league: "聯賽模式", leaguePlay: "聯賽模式",
+                        battle: "對戰模式", ranked: "排名戰", friend: "好友對戰", pvp: "即時對戰",
+                        special: "特別模式", career: "職業模式", stage: "關卡挑戰", arcade: "競技模式", clutch: "打點模式",
+                        club: "俱樂部", clubClosed: "(關閉)", clubBattle: "俱樂部戰", clubChallenge: "俱樂部挑戰", 
+                        rewardAvailableDay: "獎勵發放日",
+                        claimRewardHint: "開啟遊戲領取獎勵！",
+                        misc: "雜項",
+                        allMissions: "達成所有任務及活動",
+                        friendPoints: "收取 / 發送友情點數",
+                        clubCrafting: "俱樂部製作 / 兌換",
+                        specialShop: "積分商店兌換",
+                        weeklyBox: "開啟每週任務箱",
+                        ovrAnalysis: "戰力分析室",
+                        completed: "已完成"
                     }
                 }
             };
-
             const currentT = t[lang];
 
             const routineStructure = [
-                { id: 'league', titleKey: 'league', items: [{ id: 'league_play', labelKey: 'leaguePlay' }] },
-                { id: 'battle', titleKey: 'battle', items: [{ id: 'ranked_battle', labelKey: 'ranked' }, { id: 'friend_battle', labelKey: 'friend' }] },
-                { id: 'special', titleKey: 'special', items: [{ id: 'career_mode', labelKey: 'career' }, { id: 'stage_challenge', labelKey: 'stage' }, { id: 'arcade_mode', labelKey: 'arcade' }, { id: 'clutch_hits', labelKey: 'clutch' }] },
-                { id: 'club', titleKey: 'club', items: [{ id: 'club_battle', labelKey: 'clubBattle' }, { id: 'club_challenge', labelKey: 'clubChallenge' }] }
+                { 
+                    id: 'misc', 
+                    titleKey: 'misc', 
+                    items: [
+                        { id: 'all_missions', labelKey: 'allMissions', resetType: 'daily' },
+                        { id: 'club_crafting', labelKey: 'clubCrafting', resetType: '7_days' },
+                        { id: 'friend_points', labelKey: 'friendPoints', resetType: 'daily' },
+                        { id: 'special_shop', labelKey: 'specialShop', resetType: 'weekly_mon' },
+                        { id: 'weekly_box', labelKey: 'weeklyBox', resetType: 'weekly_wed' },
+                        { id: 'ovr_analysis', labelKey: 'ovrAnalysis', resetType: 'monthly_1st' }
+                    ]
+                },
+                { 
+                    id: 'league', 
+                    titleKey: 'league', 
+                    items: [{ id: 'league_play', labelKey: 'leaguePlay', resetType: 'daily' }] 
+                },
+                { 
+                    id: 'special', 
+                    titleKey: 'special', 
+                    items: [
+                        { id: 'career_mode', labelKey: 'career', resetType: 'daily' }, 
+                        { id: 'stage_challenge', labelKey: 'stage', resetType: 'daily' }, 
+                        { id: 'arcade_mode', labelKey: 'arcade', resetType: 'daily' }, 
+                        { id: 'clutch_hits', labelKey: 'clutch', resetType: 'daily' }
+                    ] 
+                },
+                { 
+                    id: 'battle', 
+                    titleKey: 'battle', 
+                    items: [
+                        { id: 'ranked_battle', labelKey: 'ranked', resetType: 'daily' }, 
+                        { id: 'friend_battle', labelKey: 'friend', resetType: 'daily' }, 
+                        { id: 'pvp_battle', labelKey: 'pvp', resetType: 'daily' }
+                    ] 
+                },
+                { 
+                    id: 'club', 
+                    titleKey: 'club', 
+                    items: [
+                        { id: 'club_battle', labelKey: 'clubBattle', resetType: 'daily' }, 
+                        { id: 'club_challenge', labelKey: 'clubChallenge', resetType: 'daily' }
+                    ] 
+                }
             ];
 
+            // --- Clock & Reset Logic ---
             useEffect(() => {
-                const timer = setInterval(() => { setCurrentTime(new Date()); }, 1000);
-                return () => clearInterval(timer);
-            }, []);
+                const tick = () => {
+                    const now = new Date();
+                    setCurrentTime(now); 
 
-            useEffect(() => {
-                if (startDate) { calculateDuration(startDate, timeZoneOffset); }
-            }, [startDate, currentTime, timeZoneOffset]);
+                    const serverDateObj = getServerDateObj(now, timeZoneOffset);
+                    const serverTimeMs = serverDateObj.getTime(); 
+                    const todayStr = serverDateObj.toISOString().split('T')[0];
+
+                    // Check for resets only if date changed or on initial load check
+                    // We use functional update to ensure we have latest state if called rapidly, 
+                    // though interval ensures 1s spacing.
+                    
+                    setRoutineState(prevState => {
+                        const newState = { ...prevState };
+                        let hasChanges = false;
+                        let needsDateUpdate = false;
+
+                        // Check global daily reset trigger
+                        if (lastRoutineDate !== todayStr) {
+                             needsDateUpdate = true;
+                        }
+
+                        // Check each item for its specific reset rule
+                        Object.keys(newState).forEach(itemId => {
+                            const checkedTime = newState[itemId];
+                            if (!checkedTime) return;
+
+                            let itemDef = null;
+                            routineStructure.forEach(section => {
+                                const found = section.items.find(i => i.id === itemId);
+                                if (found) itemDef = found;
+                            });
+
+                            if (!itemDef) return; // Should not happen
+
+                            let shouldReset = false;
+                            const checkedServerDateObj = getServerDateObj(new Date(checkedTime), timeZoneOffset);
+                            
+                            // Specific Logic
+                            if (itemDef.resetType === 'daily') {
+                                // If stored date != todayStr
+                                // We can rely on lastRoutineDate check for optimization, but let's be explicit per item
+                                const checkedStr = checkedServerDateObj.toISOString().split('T')[0];
+                                if (todayStr !== checkedStr) shouldReset = true;
+                            } 
+                            else if (itemDef.resetType === 'weekly_mon') {
+                                const day = serverDateObj.getUTCDay(); 
+                                const diff = serverDateObj.getUTCDate() - day + (day === 0 ? -6 : 1);
+                                const lastMonday = new Date(serverDateObj);
+                                lastMonday.setUTCDate(diff);
+                                lastMonday.setUTCHours(0,0,0,0);
+                                if (checkedServerDateObj.getTime() < lastMonday.getTime()) shouldReset = true;
+                            }
+                            else if (itemDef.resetType === 'weekly_wed') {
+                                const day = serverDateObj.getUTCDay();
+                                const hour = serverDateObj.getUTCHours();
+                                // Reset at Wed 12:00
+                                const passedReset = day > 3 || (day === 3 && hour >= 12);
+                                // if passed, last reset was this week's wed 12:00. Else, last week's.
+                                // Distance to wed: 3 - day. 
+                                const dayDiff = 3 - day; 
+                                const lastWednesday = new Date(serverDateObj);
+                                lastWednesday.setUTCDate(serverDateObj.getUTCDate() + dayDiff - (passedReset ? 0 : 7));
+                                lastWednesday.setUTCHours(12,0,0,0);
+                                
+                                if (checkedServerDateObj.getTime() < lastWednesday.getTime()) shouldReset = true;
+                            }
+                            else if (itemDef.resetType === 'monthly_1st') {
+                                const lastFirst = new Date(serverDateObj);
+                                lastFirst.setUTCDate(1);
+                                lastFirst.setUTCHours(0,0,0,0);
+                                if (checkedServerDateObj.getTime() < lastFirst.getTime()) shouldReset = true;
+                            }
+                            else if (itemDef.resetType === '7_days') {
+                                const checkDayStart = new Date(checkedServerDateObj);
+                                checkDayStart.setUTCHours(0,0,0,0);
+                                const expiryTime = checkDayStart.getTime() + (7 * 24 * 60 * 60 * 1000);
+                                if (serverTimeMs >= expiryTime) shouldReset = true;
+                            }
+
+                            if (shouldReset) {
+                                delete newState[itemId];
+                                hasChanges = true;
+                            }
+                        });
+
+                        if (needsDateUpdate) {
+                            setLastRoutineDate(todayStr); // This triggers the useEffect to save to localStorage
+                        }
+
+                        return hasChanges ? newState : prevState;
+                    });
+                };
+
+                const timer = setInterval(tick, 1000);
+                tick(); // Run once immediately
+                
+                return () => clearInterval(timer);
+            }, [timeZoneOffset, lastRoutineDate]); // Dependency on lastRoutineDate to ensure we catch changes
+
+            // --- Custom Date Formatter ---
+            const formatDate = (date, language, isUtc = false) => {
+                if (language === 'zh') {
+                    const get = (method) => isUtc ? date[`getUTC${method}`]() : date[`get${method}`]();
+                    const y = get('FullYear');
+                    const m = String(get('Month') + 1).padStart(2, '0');
+                    const d = String(get('Date')).padStart(2, '0');
+                    const days = ['日', '一', '二', '三', '四', '五', '六'];
+                    const w = days[get('Day')];
+                    return `${y}年 ${m}月 ${d}日 星期${w}`;
+                } else {
+                    return date.toLocaleDateString('en-US', { 
+                        weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: isUtc ? 'UTC' : undefined 
+                    });
+                }
+            };
+
+            // --- Handlers ---
+            const toggleRoutineItem = (id) => {
+                setRoutineState(prev => {
+                    const newState = { ...prev };
+                    if (newState[id]) {
+                        delete newState[id];
+                    } else {
+                        newState[id] = new Date().getTime();
+                    }
+                    return newState;
+                });
+            };
+
+            useEffect(() => { if (startDate) calculateDuration(startDate, timeZoneOffset); }, [startDate, currentTime, timeZoneOffset]);
 
             const calculateDuration = (start, offset) => {
                 const [y, m, d] = start.split('-').map(Number);
@@ -270,208 +459,129 @@
                 const startTimestamp = utcMidnight - (offset * 60 * 60 * 1000);
                 const nowTimestamp = new Date().getTime();
 
-                if (startTimestamp > nowTimestamp) {
-                    setStats(null);
-                    return;
-                }
+                if (startTimestamp > nowTimestamp) { setStats(null); return; }
 
                 const diffTime = Math.abs(nowTimestamp - startTimestamp);
                 const rawDaysDiff = diffTime / (1000 * 60 * 60 * 24);
                 const totalDays = rawDaysDiff + 1;
-
                 const years = totalDays / 365.25;
                 const months = totalDays / 30.4375;
                 const weeks = totalDays / 7;
                 const days = totalDays;
 
-                setStats({
-                    years: years.toFixed(2),
-                    months: months.toFixed(1),
-                    weeks: weeks.toFixed(0),
-                    days: Math.floor(days).toLocaleString(),
+                setStats({ 
+                    years: years.toFixed(3), 
+                    months: months.toFixed(2), 
+                    weeks: weeks.toFixed(1), 
+                    days: Math.floor(days).toLocaleString(), 
                     rawDays: days 
                 });
             };
 
-            const toggleRoutineItem = (id) => {
-                setRoutineState(prev => ({ ...prev, [id]: !prev[id] }));
-            };
-
+            const toggleTheme = () => setIsDark(!isDark);
+            const toggleLanguage = () => setLang(prev => prev === 'en' ? 'zh' : 'en');
+            
+            // --- Date Picker Logic (Condensed for brevity, same as previous) ---
             const daysInMonth = (month, year) => new Date(year, month + 1, 0).getDate();
             const firstDayOfMonth = (month, year) => new Date(year, month, 1).getDay();
-
             const handleDayClick = (day) => {
                 const formattedMonth = String(pickerMonth + 1).padStart(2, '0');
                 const formattedDay = String(day).padStart(2, '0');
-                const dateStr = `${pickerYear}-${formattedMonth}-${formattedDay}`;
-                setStartDate(dateStr);
+                setStartDate(`${pickerYear}-${formattedMonth}-${formattedDay}`);
                 setIsPickerOpen(false);
             };
-
-            const openPicker = () => {
-                if (startDate) {
-                    const [y, m, d] = startDate.split('-').map(Number);
-                    setPickerYear(y);
-                    setPickerMonth(m - 1);
-                } else {
-                    const now = new Date();
-                    setPickerYear(now.getFullYear());
-                    setPickerMonth(now.getMonth());
-                }
-                setIsPickerOpen(true);
-            };
-
+            const openPicker = () => { if (startDate) { const [y, m, d] = startDate.split('-').map(Number); setPickerYear(y); setPickerMonth(m - 1); } else { const now = new Date(); setPickerYear(now.getFullYear()); setPickerMonth(now.getMonth()); } setIsPickerOpen(true); };
             const closePicker = (e) => { e.stopPropagation(); setIsPickerOpen(false); };
-
-            const changeMonth = (offset) => {
-                let newMonth = pickerMonth + offset;
-                let newYear = pickerYear;
-                if (newMonth < 0) { newMonth = 11; newYear -= 1; } 
-                else if (newMonth > 11) { newMonth = 0; newYear += 1; }
-                if (newYear < 2016) return;
-                setPickerMonth(newMonth);
-                setPickerYear(newYear);
-            };
-
-            const handleYearChange = (e) => setPickerYear(parseInt(e.target.value));
+            const changeMonth = (offset) => { let nm = pickerMonth + offset, ny = pickerYear; if (nm < 0) { nm = 11; ny -= 1; } else if (nm > 11) { nm = 0; ny += 1; } if (ny < 2016) return; setPickerMonth(nm); setPickerYear(ny); };
+            const handleYearChange = (e) => { const y = parseInt(e.target.value); setPickerYear(y); if (y === 2016 && pickerMonth < 9) setPickerMonth(9); };
             const handleMonthChange = (e) => setPickerMonth(parseInt(e.target.value));
-            const handleTimeZoneChange = (e) => setTimeZoneOffset(parseInt(e.target.value));
-
-            const openTimePicker = () => {
-                if (fullBallsTime) {
-                    const [h, m] = fullBallsTime.split(':').map(Number);
-                    setPickerHour(h);
-                    setPickerMinute(m);
-                } else {
-                    const now = new Date();
-                    setPickerHour(now.getHours());
-                    setPickerMinute(now.getMinutes());
-                }
-                setIsTimePickerOpen(true);
-            };
-
-            const closeTimePicker = (e) => { e.stopPropagation(); setIsTimePickerOpen(false); };
-
-            const handleHourChange = (e) => {
-                const h = parseInt(e.target.value);
-                setPickerHour(h);
-                updateFullBallsTime(h, pickerMinute);
-            };
-
-            const handleMinuteChange = (e) => {
-                const m = parseInt(e.target.value);
-                setPickerMinute(m);
-                updateFullBallsTime(pickerHour, m);
-            };
-
-            const updateFullBallsTime = (h, m) => {
-                setFullBallsTime(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
-            };
-
-            const getDisplayDate = (dateString) => {
-                if (!dateString) return '';
-                const [y, m, d] = dateString.split('-');
-                return `${m}/${d}/${y}`;
-            };
-
-            const getLabel = (valString, type) => {
-                if (!valString) return `${currentT.total} ${currentT[type + 's']}`;
-                if (lang === 'zh') return `${currentT.total} ${currentT[type]}`;
-                const val = parseFloat(valString.toString().replace(/,/g, ''));
-                return val <= 1 ? `${currentT.total} ${currentT[type]}` : `${currentT.total} ${currentT[type + 's']}`;
-            };
-
-            const getUnit = (valString, type) => {
-                if (lang === 'zh') return currentT[type];
-                if (!valString) return currentT[type + 's'];
-                const val = parseFloat(valString.toString().replace(/,/g, ''));
-                return val <= 1 ? currentT[type] : currentT[type + 's'];
-            }
-
-            const currentYear = new Date().getFullYear();
-            const yearsRange = Array.from({ length: currentYear - 2015 }, (_, i) => currentYear - i);
-            const hoursRange = Array.from({ length: 24 }, (_, i) => i);
-            const minutesRange = Array.from({ length: 60 }, (_, i) => i);
-
-            const toggleTheme = () => setIsDark(!isDark);
-            const toggleLanguage = () => setLang(prev => prev === 'en' ? 'zh' : 'en');
+            const handleTimeZoneSelect = (value) => { setTimeZoneOffset(parseInt(value)); setIsTimeZoneOpen(false); };
+            const getDisplayDate = (dateString) => { if (!dateString) return ''; const [y, m, d] = dateString.split('-'); return `${m}/${d}/${y}`; };
+            
+            // Re-calculated vars for picker ranges
+            const serverDateObj = getServerDateObj(currentTime, timeZoneOffset);
+            const serverYear = serverDateObj.getUTCFullYear();
+            const serverMonth = serverDateObj.getUTCMonth();
+            const serverDay = serverDateObj.getUTCDate();
+            const yearsRange = Array.from({ length: serverYear - 2016 + 1 }, (_, i) => serverYear - i);
 
             return (
                 <div className={isDark ? 'dark' : ''}>
                     <div className="min-h-screen bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-200 font-noto selection:bg-blue-500 selection:text-white flex flex-col items-center relative transition-colors duration-300">
-                        
-                        <header className="fixed top-0 left-0 w-full z-50 bg-slate-100/90 dark:bg-slate-900/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-700 transition-colors duration-300 shadow-sm">
+                        {/* Header */}
+                        <header className="fixed top-0 left-0 w-full z-50 bg-slate-100/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-700 transition-colors duration-300 shadow-sm">
                             <div className="max-w-5xl mx-auto px-4 h-20 flex items-center justify-center relative">
-                                <h1 className="text-xl md:text-3xl font-bold tracking-wider text-blue-600 dark:text-blue-400 drop-shadow-sm transition-colors duration-300 text-center truncate px-12 md:px-0">
-                                    {currentT.title}
-                                </h1>
+                                <h1 className="text-xl md:text-3xl font-bold tracking-wider text-blue-600 dark:text-blue-400 drop-shadow-sm transition-colors duration-300 text-center truncate px-12 md:px-0">{currentT.title}</h1>
                                 <div className="absolute right-4 flex space-x-2">
-                                    <button onClick={toggleTheme} className="p-2 rounded-full transition-colors duration-200 shadow-md border bg-white border-slate-200 text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-white" title="Toggle Theme">
-                                        {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-                                    </button>
-                                    <button onClick={toggleLanguage} className="p-2 rounded-full transition-colors duration-200 shadow-md border bg-white border-slate-200 text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-white font-bold text-xs w-9 h-9 flex items-center justify-center" title="Switch Language">
-                                        {lang === 'en' ? '中' : 'EN'}
-                                    </button>
+                                    <button onClick={toggleTheme} className="p-2 rounded-full transition-colors duration-200 shadow-md border bg-white border-slate-200 text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-white" title="Toggle Theme">{isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}</button>
+                                    <button onClick={toggleLanguage} className="p-2 rounded-full transition-colors duration-200 shadow-md border bg-white border-slate-200 text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-white font-bold text-xs w-9 h-9 flex items-center justify-center" title="Switch Language">{lang === 'en' ? '中' : 'EN'}</button>
                                 </div>
                             </div>
                         </header>
 
+                        {/* Content */}
                         <div className="max-w-5xl w-full px-4 flex flex-col gap-10 pt-28 pb-12 animate-in fade-in duration-700">
-                            
-                            {/* Current Time Section */}
-                            <section className="bg-white dark:bg-slate-800 rounded-2xl p-10 shadow-xl border border-slate-200 dark:border-slate-700 relative overflow-hidden min-h-[200px] flex flex-col justify-center w-full transition-colors duration-300">
-                                <div className="absolute -top-6 -right-6 p-4 opacity-5 pointer-events-none">
-                                    <Clock size={180} />
+                            {/* Time Section */}
+                            <section className="bg-white dark:bg-slate-800 rounded-2xl p-10 shadow-xl border border-slate-200 dark:border-slate-700 relative overflow-hidden flex flex-col md:flex-row gap-8 items-center justify-center w-full transition-colors duration-300">
+                                <div className="absolute -top-6 -right-6 p-4 opacity-5 pointer-events-none hidden md:block"><Clock size={180} /></div>
+                                <div className="absolute -top-6 -left-6 p-4 opacity-5 pointer-events-none md:hidden"><Clock size={120} /></div>
+                                {/* Current Time */}
+                                <div className="relative z-10 text-center md:text-right flex-1 w-full">
+                                    <h2 className="text-slate-500 dark:text-slate-400 text-sm font-semibold uppercase tracking-wider flex items-center justify-center md:justify-end gap-2 mb-2">{currentT.currentTime}</h2>
+                                    <div className="text-4xl md:text-5xl lg:text-6xl font-bold font-mono text-blue-600 dark:text-blue-400 tracking-wider transition-colors duration-300">{currentTime.toLocaleTimeString([], { hour12: false })}</div>
+                                    <div className="text-lg md:text-xl text-slate-500 dark:text-slate-400 font-medium mt-1">{formatDate(currentTime, lang, false)}</div>
                                 </div>
-                                <div className="relative z-10 text-center md:text-left space-y-4">
-                                    <h2 className="text-slate-500 dark:text-slate-400 text-sm font-semibold uppercase tracking-wider flex items-center justify-center md:justify-start gap-2">
-                                        {currentT.currentTime}
-                                    </h2>
-                                    <div className="text-5xl md:text-7xl font-bold font-mono text-blue-600 dark:text-blue-400 tracking-wider transition-colors duration-300">
-                                        {currentTime.toLocaleTimeString([], { hour12: false })}
-                                    </div>
-                                    <div className="text-xl text-slate-500 dark:text-slate-400 font-medium md:ml-1">
-                                        {currentTime.toLocaleDateString(lang === 'zh' ? 'zh-TW' : 'en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-                                    </div>
+                                <div className="w-full md:w-px h-px md:h-24 bg-slate-200 dark:bg-slate-700 mx-auto"></div>
+                                {/* Server Time */}
+                                <div className="relative z-10 text-center md:text-left flex-1 w-full">
+                                    <h2 className="text-slate-500 dark:text-slate-400 text-sm font-semibold uppercase tracking-wider flex items-center justify-center md:justify-start gap-2 mb-2">{currentT.serverTime}</h2>
+                                    <div className="text-4xl md:text-5xl lg:text-6xl font-bold font-mono text-indigo-600 dark:text-indigo-400 tracking-wider transition-colors duration-300">{serverDateObj.toLocaleTimeString([], { hour12: false, timeZone: 'UTC' })}</div>
+                                    <div className="text-lg md:text-xl text-slate-500 dark:text-slate-400 font-medium mt-1">{formatDate(serverDateObj, lang, true)}</div>
                                 </div>
                             </section>
 
                             {/* Account Age Calculator Section */}
                             <section className="bg-white dark:bg-slate-800 rounded-2xl p-8 shadow-xl border border-slate-200 dark:border-slate-700 w-full relative transition-colors duration-300">
-                                <div className="mb-8 w-full">
-                                    <div className="flex items-center gap-3 border-b border-slate-200 dark:border-slate-700 pb-4 mb-6">
+                                <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-700 pb-4 mb-6 cursor-pointer group" onClick={() => setIsAccountTrackerOpen(!isAccountTrackerOpen)}>
+                                    <div className="flex items-center gap-3">
                                         <History className="text-blue-600 dark:text-blue-500 w-8 h-8 transition-colors duration-300" />
                                         <h2 className="text-2xl font-bold text-slate-900 dark:text-white transition-colors duration-300">{currentT.accountTracker}</h2>
                                     </div>
-
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                        {/* Date Input */}
+                                    <ChevronDown className={`w-6 h-6 text-slate-400 group-hover:text-blue-500 transition-transform duration-200 ${isAccountTrackerOpen ? 'rotate-180' : ''}`} />
+                                </div>
+                                {isAccountTrackerOpen && (
+                                    <>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8 animate-in fade-in slide-in-from-top-2 duration-300">
                                         <div>
-                                            <label className="block text-slate-500 dark:text-slate-400 text-sm font-semibold uppercase tracking-wider mb-3 transition-colors duration-300">
-                                                {currentT.creationDate}
-                                            </label>
+                                            <label className="block text-slate-500 dark:text-slate-400 text-sm font-semibold uppercase tracking-wider mb-3 transition-colors duration-300">{currentT.creationDate}</label>
                                             <div className="relative w-full h-14">
                                                 <div className={`block w-full h-full pl-14 pr-4 bg-slate-50 dark:bg-slate-900 border ${isPickerOpen ? 'border-blue-500 ring-2 ring-blue-500' : 'border-slate-300 dark:border-slate-600'} rounded-xl text-lg flex items-center cursor-pointer hover:border-blue-400 transition-all`} onClick={openPicker}>
-                                                    <div className="absolute inset-y-0 left-0 w-14 flex items-center justify-center pointer-events-none">
-                                                        <CalendarIcon className={`h-6 w-6 ${isPickerOpen ? 'text-blue-600 dark:text-blue-500' : 'text-slate-400'}`} />
-                                                    </div>
-                                                    {startDate ? (
-                                                        <span className="text-slate-900 dark:text-white">{getDisplayDate(startDate)}</span>
-                                                    ) : (
-                                                        <span className="text-slate-500 text-base">{currentT.selectDate}</span>
-                                                    )}
+                                                    <div className="absolute inset-y-0 left-0 w-14 flex items-center justify-center pointer-events-none"><CalendarIcon className={`h-6 w-6 ${isPickerOpen ? 'text-blue-600 dark:text-blue-500' : 'text-slate-400'}`} /></div>
+                                                    {startDate ? (<span className="text-slate-900 dark:text-white">{getDisplayDate(startDate)}</span>) : (<span className="text-slate-500 text-base">{currentT.selectDate}</span>)}
                                                 </div>
                                                 {isPickerOpen && (
                                                     <>
                                                         <div className="fixed inset-0 z-40" onClick={closePicker}></div>
                                                         <div className="absolute top-full left-0 mt-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-xl shadow-2xl z-50 p-4 w-full md:w-80 animate-in fade-in zoom-in-95 duration-200 font-noto">
                                                             <div className="flex items-center justify-between mb-4 gap-2">
-                                                                <button onClick={() => changeMonth(-1)} className="p-1 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full text-slate-500 dark:text-slate-300 transition-colors"><ChevronLeft size={20} /></button>
+                                                                <button onClick={() => changeMonth(-1)} 
+                                                                    disabled={(pickerYear < 2016) || (pickerYear === 2016 && pickerMonth <= 9)} 
+                                                                    className={`p-1 rounded-full transition-colors ${((pickerYear < 2016) || (pickerYear === 2016 && pickerMonth <= 9)) ? 'text-slate-300 dark:text-slate-600 cursor-not-allowed' : 'hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-300'}`}>
+                                                                    <ChevronLeft size={20} />
+                                                                </button>
                                                                 <div className="flex gap-2 flex-1 justify-center">
-                                                                    <select value={pickerMonth} onChange={handleMonthChange} className="bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-white text-sm border border-slate-300 dark:border-slate-600 rounded px-2 py-1 focus:outline-none focus:border-blue-500 font-noto">{currentT.monthsLong.map((m, i) => (<option key={m} value={i}>{m}</option>))}</select>
+                                                                    <select value={pickerMonth} onChange={handleMonthChange} className="bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-white text-sm border border-slate-300 dark:border-slate-600 rounded px-2 py-1 focus:outline-none focus:border-blue-500 font-noto">
+                                                                        {currentT.monthsLong.map((m, i) => (
+                                                                            <option key={m} value={i} disabled={(pickerYear === 2016 && i < 9) || (pickerYear === serverYear && i > serverMonth)}>{m}</option>
+                                                                        ))}
+                                                                    </select>
                                                                     <select value={pickerYear} onChange={handleYearChange} className="bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-white text-sm border border-slate-300 dark:border-slate-600 rounded px-2 py-1 focus:outline-none focus:border-blue-500 font-noto">{yearsRange.map(year => (<option key={year} value={year}>{year}</option>))}</select>
                                                                 </div>
-                                                                <button onClick={() => changeMonth(1)} className="p-1 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full text-slate-500 dark:text-slate-300 transition-colors"><ChevronRight size={20} /></button>
+                                                                <button onClick={() => changeMonth(1)}
+                                                                    disabled={(pickerYear > serverYear) || (pickerYear === serverYear && pickerMonth >= serverMonth)}
+                                                                    className={`p-1 rounded-full transition-colors ${((pickerYear > serverYear) || (pickerYear === serverYear && pickerMonth >= serverMonth)) ? 'text-slate-300 dark:text-slate-600 cursor-not-allowed' : 'hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-300'}`}>
+                                                                    <ChevronRight size={20} />
+                                                                </button>
                                                             </div>
                                                             <div className="grid grid-cols-7 mb-2 text-center">{currentT.weekDays.map(d => (<div key={d} className="text-xs font-bold text-slate-500 dark:text-slate-500">{d}</div>))}</div>
                                                             <div className="grid grid-cols-7 gap-1">
@@ -480,8 +590,23 @@
                                                                     const day = i + 1;
                                                                     const isSelected = startDate === `${pickerYear}-${String(pickerMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
                                                                     const isToday = new Date().getDate() === day && new Date().getMonth() === pickerMonth && new Date().getFullYear() === pickerYear;
+                                                                    
+                                                                    const isTooEarly = (pickerYear === 2016 && pickerMonth === 9 && day < 12); 
+                                                                    const isFuture = (pickerYear === serverYear && pickerMonth === serverMonth && day > serverDay); 
+                                                                    const isDisabled = isTooEarly || isFuture;
+
                                                                     return (
-                                                                        <button key={day} onClick={() => handleDayClick(day)} className={`h-8 md:h-9 w-full rounded-md text-sm font-medium transition-all ${isSelected ? 'bg-blue-600 text-white shadow-md' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-white'} ${isToday && !isSelected ? 'border border-blue-500/50 text-blue-600 dark:text-blue-400' : ''}`}>{day}</button>
+                                                                        <button 
+                                                                            key={day} 
+                                                                            onClick={() => !isDisabled && handleDayClick(day)} 
+                                                                            disabled={isDisabled}
+                                                                            className={`h-8 md:h-9 w-full rounded-md text-sm font-medium transition-all 
+                                                                                ${isDisabled ? 'text-slate-300 dark:text-slate-700 cursor-not-allowed' : 
+                                                                                    isSelected ? 'bg-blue-600 text-white shadow-md' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-white'} 
+                                                                                ${isToday && !isSelected && !isDisabled ? 'border border-blue-500/50 text-blue-600 dark:text-blue-400' : ''}`}
+                                                                        >
+                                                                            {day}
+                                                                        </button>
                                                                     );
                                                                 })}
                                                             </div>
@@ -490,151 +615,173 @@
                                                 )}
                                             </div>
                                         </div>
-                                        {/* Time Zone Input */}
-                                        <div>
-                                            <label className="block text-slate-500 dark:text-slate-400 text-sm font-semibold uppercase tracking-wider mb-3 transition-colors duration-300">
-                                                {currentT.gameTimeZone}
-                                            </label>
+                                        <div ref={timeZoneRef}>
+                                            <label className="block text-slate-500 dark:text-slate-400 text-sm font-semibold uppercase tracking-wider mb-3 transition-colors duration-300">{currentT.gameTimeZone}</label>
                                             <div className="relative w-full h-14">
-                                                <div className="absolute inset-y-0 left-0 w-14 flex items-center justify-center pointer-events-none z-10">
-                                                    <Globe className="h-6 w-6 text-slate-400" />
+                                                <div className={`block w-full h-full pl-14 pr-4 bg-slate-50 dark:bg-slate-900 border ${isTimeZoneOpen ? 'border-blue-500 ring-2 ring-blue-500' : 'border-slate-300 dark:border-slate-600'} rounded-xl text-lg flex items-center justify-between cursor-pointer hover:border-blue-400 transition-all`} onClick={() => setIsTimeZoneOpen(!isTimeZoneOpen)}>
+                                                    <div className="absolute inset-y-0 left-0 w-14 flex items-center justify-center pointer-events-none"><Globe className={`h-6 w-6 ${isTimeZoneOpen ? 'text-blue-600 dark:text-blue-500' : 'text-slate-400'}`} /></div>
+                                                    <span className="text-slate-900 dark:text-white truncate">{currentT.regions[timeZoneOffset.toString()]}</span>
+                                                    <div className={`transform transition-transform duration-200 ${isTimeZoneOpen ? 'rotate-180' : ''}`}><ChevronDown className="h-5 w-5 text-slate-400" /></div>
                                                 </div>
-                                                <select value={timeZoneOffset} onChange={handleTimeZoneChange} className="block w-full h-full pl-14 pr-4 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl text-lg text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 cursor-pointer appearance-none transition-colors">
-                                                    <option value="-5">{currentT.regions.americas}</option>
-                                                    <option value="1">{currentT.regions.europe}</option>
-                                                    <option value="9">{currentT.regions.asia}</option>
-                                                </select>
-                                                <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
-                                                    <svg className="h-5 w-5 text-slate-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
-                                                </div>
+                                                {isTimeZoneOpen && (
+                                                    <div className="absolute top-full left-0 mt-2 w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-xl shadow-2xl z-50 p-2 animate-in fade-in zoom-in-95 duration-200">
+                                                        <div className="flex flex-col gap-1">
+                                                            {['-5', '1', '9'].map(offsetKey => (
+                                                                <button key={offsetKey} onClick={() => handleTimeZoneSelect(offsetKey)} className={`w-full text-left px-4 py-3 rounded-lg text-sm font-medium transition-colors ${timeZoneOffset.toString() === offsetKey ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>{currentT.regions[offsetKey]}</button>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
                                     </div>
-                                </div>
-
-                                {/* Stats Grid */}
-                                {startDate && stats ? (
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500 pt-4 border-t border-slate-200 dark:border-slate-700/50 w-full transition-colors duration-300">
-                                        <div className="bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-700 p-8 rounded-2xl shadow-lg hover:border-blue-500/50 transition-colors group flex flex-col justify-center min-h-[160px] min-w-0">
-                                            <div className="flex items-center justify-between mb-4"><span className="text-slate-500 dark:text-slate-400 text-sm font-bold uppercase tracking-widest">{getUnit(stats.years, 'year')}</span></div>
-                                            <div className="text-4xl font-bold text-slate-900 dark:text-white mb-2 font-mono">{stats.years}</div>
-                                            <div className="text-sm text-slate-500">{getLabel(stats.years, 'year')}</div>
+                                    {startDate && stats ? (
+                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500 pt-4 border-t border-slate-200 dark:border-slate-700/50 w-full transition-colors duration-300">
+                                            <div className="bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-700 p-8 rounded-2xl shadow-lg hover:border-blue-500/50 transition-colors group flex flex-col justify-center min-h-[160px] min-w-0">
+                                                <div className="flex items-center justify-between mb-4"><span className="text-slate-500 dark:text-slate-400 text-sm font-bold uppercase tracking-widest">{currentT.total} Years</span></div>
+                                                <div className="text-4xl font-bold text-slate-900 dark:text-white mb-2 font-mono">{stats.years}</div>
+                                            </div>
+                                            <div className="bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-700 p-8 rounded-2xl shadow-lg hover:border-blue-500/50 transition-colors group flex flex-col justify-center min-h-[160px] min-w-0">
+                                                <div className="flex items-center justify-between mb-4"><span className="text-slate-500 dark:text-slate-400 text-sm font-bold uppercase tracking-widest">{currentT.total} Months</span></div>
+                                                <div className="text-4xl font-bold text-slate-900 dark:text-white mb-2 font-mono">{stats.months}</div>
+                                            </div>
+                                            <div className="bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-700 p-8 rounded-2xl shadow-lg hover:border-blue-500/50 transition-colors group flex flex-col justify-center min-h-[160px] min-w-0">
+                                                <div className="flex items-center justify-between mb-4"><span className="text-slate-500 dark:text-slate-400 text-sm font-bold uppercase tracking-widest">{currentT.total} Weeks</span></div>
+                                                <div className="text-4xl font-bold text-slate-900 dark:text-white mb-2 font-mono">{stats.weeks}</div>
+                                            </div>
+                                            <div className="bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-700 p-8 rounded-2xl shadow-lg hover:border-blue-500/50 transition-colors group flex flex-col justify-center min-h-[160px] min-w-0">
+                                                <div className="flex items-center justify-between mb-4"><span className="text-slate-500 dark:text-slate-400 text-sm font-bold uppercase tracking-widest">{currentT.total} Days</span></div>
+                                                <div className="text-4xl font-bold text-slate-900 dark:text-white mb-2 font-mono">{stats.days}</div>
+                                            </div>
                                         </div>
-                                        <div className="bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-700 p-8 rounded-2xl shadow-lg hover:border-blue-500/50 transition-colors group flex flex-col justify-center min-h-[160px] min-w-0">
-                                            <div className="flex items-center justify-between mb-4"><span className="text-slate-500 dark:text-slate-400 text-sm font-bold uppercase tracking-widest">{getUnit(stats.months, 'month')}</span></div>
-                                            <div className="text-4xl font-bold text-slate-900 dark:text-white mb-2 font-mono">{stats.months}</div>
-                                            <div className="text-sm text-slate-500">{getLabel(stats.months, 'month')}</div>
+                                    ) : (
+                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 pt-4 border-t border-transparent w-full h-0 overflow-hidden invisible"><div className="min-w-0"></div><div className="min-w-0"></div><div className="min-w-0"></div><div className="min-w-0"></div></div>
+                                    )}
+                                    {startDate && !stats && (
+                                        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900/50 p-6 rounded-xl text-red-600 dark:text-red-200 text-center mt-6">
+                                            {lang === 'en' ? "Invalid date selected. Please choose a date in the past." : "選擇的日期無效，請選擇過去的日期。"}
                                         </div>
-                                        <div className="bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-700 p-8 rounded-2xl shadow-lg hover:border-blue-500/50 transition-colors group flex flex-col justify-center min-h-[160px] min-w-0">
-                                            <div className="flex items-center justify-between mb-4"><span className="text-slate-500 dark:text-slate-400 text-sm font-bold uppercase tracking-widest">{getUnit(stats.weeks, 'week')}</span></div>
-                                            <div className="text-4xl font-bold text-slate-900 dark:text-white mb-2 font-mono">{stats.weeks}</div>
-                                            <div className="text-sm text-slate-500">{getLabel(stats.weeks, 'week')}</div>
-                                        </div>
-                                        <div className="bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-700 p-8 rounded-2xl shadow-lg hover:border-blue-500/50 transition-colors group flex flex-col justify-center min-h-[160px] min-w-0">
-                                            <div className="flex items-center justify-between mb-4"><span className="text-slate-500 dark:text-slate-400 text-sm font-bold uppercase tracking-widest">{getUnit(stats.days.replace(/,/g, ''), 'day')}</span></div>
-                                            <div className="text-4xl font-bold text-slate-900 dark:text-white mb-2 font-mono">{stats.days}</div>
-                                            <div className="text-sm text-slate-500">{getLabel(stats.days.replace(/,/g, ''), 'day')}</div>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 pt-4 border-t border-transparent w-full h-0 overflow-hidden invisible"><div className="min-w-0"></div><div className="min-w-0"></div><div className="min-w-0"></div><div className="min-w-0"></div></div>
-                                )}
-                                {startDate && !stats && (
-                                    <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900/50 p-6 rounded-xl text-red-600 dark:text-red-200 text-center mt-6">
-                                        {lang === 'en' ? "Invalid date selected. Please choose a date in the past." : "選擇的日期無效，請選擇過去的日期。"}
-                                    </div>
+                                    )}
+                                    </>
                                 )}
                             </section>
 
                             {/* Routine Checker Section */}
                             <section className="bg-white dark:bg-slate-800 rounded-2xl p-8 shadow-xl border border-slate-200 dark:border-slate-700 w-full relative transition-colors duration-300">
-                                <div className="flex items-center gap-3 border-b border-slate-200 dark:border-slate-700 pb-4 mb-6">
-                                    <CheckCircle2 className="text-green-600 dark:text-green-500 w-8 h-8 transition-colors duration-300" />
-                                    <h2 className="text-2xl font-bold text-slate-900 dark:text-white transition-colors duration-300">{currentT.routine.title}</h2>
-                                </div>
-
-                                <div className="mb-6">
-                                    <label className="block text-slate-500 dark:text-slate-400 text-sm font-semibold uppercase tracking-wider mb-3 transition-colors duration-300">
-                                        {currentT.routine.fullBallsTime}
-                                    </label>
-                                    <div className="relative w-full md:w-1/2 h-14">
-                                        <div 
-                                            className={`block w-full h-full pl-14 pr-4 bg-slate-50 dark:bg-slate-900 border ${isTimePickerOpen ? 'border-blue-500 ring-2 ring-blue-500' : 'border-slate-300 dark:border-slate-600'} rounded-xl text-lg flex items-center cursor-pointer hover:border-blue-400 transition-all`}
-                                            onClick={openTimePicker}
-                                        >
-                                            <div className="absolute inset-y-0 left-0 w-14 flex items-center justify-center pointer-events-none">
-                                                <Timer className={`h-6 w-6 ${isTimePickerOpen ? 'text-blue-600 dark:text-blue-500' : 'text-slate-400'}`} />
-                                            </div>
-                                            {fullBallsTime ? (
-                                                <span className="text-slate-900 dark:text-white">{fullBallsTime}</span>
-                                            ) : (
-                                                <span className="text-slate-500 text-base">{currentT.routine.selectTime}</span>
-                                            )}
-                                        </div>
-                                        {isTimePickerOpen && (
-                                            <>
-                                                <div className="fixed inset-0 z-40" onClick={closeTimePicker}></div>
-                                                <div className="absolute top-full left-0 mt-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-xl shadow-2xl z-50 p-4 w-full animate-in fade-in zoom-in-95 duration-200 font-noto">
-                                                    <div className="flex gap-4 justify-center">
-                                                        <div className="flex flex-col items-center">
-                                                            <label className="text-xs text-slate-500 dark:text-slate-400 mb-1 font-bold">Hour</label>
-                                                            <select value={pickerHour} onChange={handleHourChange} className="bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-white text-lg border border-slate-300 dark:border-slate-600 rounded px-2 py-2 w-20 focus:outline-none focus:border-blue-500 font-noto text-center">{hoursRange.map(h => (<option key={h} value={h}>{String(h).padStart(2, '0')}</option>))}</select>
-                                                        </div>
-                                                        <div className="flex items-center pt-5 text-slate-400 font-bold">:</div>
-                                                        <div className="flex flex-col items-center">
-                                                            <label className="text-xs text-slate-500 dark:text-slate-400 mb-1 font-bold">Min</label>
-                                                            <select value={pickerMinute} onChange={handleMinuteChange} className="bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-white text-lg border border-slate-300 dark:border-slate-600 rounded px-2 py-2 w-20 focus:outline-none focus:border-blue-500 font-noto text-center">{minutesRange.map(m => (<option key={m} value={m}>{String(m).padStart(2, '0')}</option>))}</select>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </>
-                                        )}
+                                <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-700 pb-4 mb-6 cursor-pointer group" onClick={() => setIsRoutineCheckerOpen(!isRoutineCheckerOpen)}>
+                                    <div className="flex items-center gap-3">
+                                        <CheckCircle2 className="text-green-600 dark:text-green-500 w-8 h-8 transition-colors duration-300" />
+                                        <h2 className="text-2xl font-bold text-slate-900 dark:text-white transition-colors duration-300">{currentT.routine.title}</h2>
                                     </div>
+                                    <ChevronDown className={`w-6 h-6 text-slate-400 group-hover:text-green-500 transition-transform duration-200 ${isRoutineCheckerOpen ? 'rotate-180' : ''}`} />
                                 </div>
+                                {isRoutineCheckerOpen && (
+                                    <div className="flex flex-col gap-6 animate-in fade-in slide-in-from-top-2 duration-300">
+                                        
+                                        {/* Miscellaneous Section (Full Width, Custom Grid) */}
+                                        <div className="bg-slate-50 dark:bg-slate-900/50 rounded-xl p-5 border border-slate-200 dark:border-slate-700/50 w-full group">
+                                            <div className="flex items-center gap-2 mb-4 pb-2 border-b border-slate-200 dark:border-slate-700/50">
+                                                <h3 className="font-bold text-slate-700 dark:text-slate-200">
+                                                    {currentT.routine.misc}
+                                                </h3>
+                                            </div>
 
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    {routineStructure.map((section) => {
-                                        return (
-                                            <div key={section.id} className="bg-slate-50 dark:bg-slate-900/50 rounded-xl p-5 border border-slate-200 dark:border-slate-700/50">
-                                                <div className="flex items-center gap-2 mb-4 pb-2 border-b border-slate-200 dark:border-slate-700/50">
-                                                    <h3 className="font-bold text-slate-700 dark:text-slate-200">{currentT.routine[section.titleKey]}</h3>
-                                                </div>
-                                                <div className="space-y-3">
-                                                    {section.items.map((item) => {
+                                            <div className="relative">
+                                                {/* Completed Overlay for Miscellaneous */}
+                                                {routineStructure.find(s => s.id === 'misc').items.every(i => routineState[i.id]) && (
+                                                    <div className="absolute inset-0 z-10 bg-green-100/90 dark:bg-green-900/90 rounded-xl flex flex-row items-center justify-center gap-2 opacity-100 group-hover:opacity-0 group-hover:pointer-events-none transition-opacity duration-300">
+                                                        <CheckCircle2 className="w-6 h-6 text-green-600 dark:text-green-400" />
+                                                        <span className="text-xl font-bold text-green-700 dark:text-green-300 tracking-wider">{currentT.routine.completed}</span>
+                                                    </div>
+                                                )}
+                                                
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                    {routineStructure.find(s => s.id === 'misc').items.map((item) => {
                                                         const isChecked = routineState[item.id] || false;
                                                         return (
-                                                            <button
-                                                                key={item.id}
-                                                                onClick={() => toggleRoutineItem(item.id)}
-                                                                className={`w-full flex items-center justify-between p-3 rounded-lg border transition-all duration-200 ${
-                                                                    isChecked 
-                                                                    ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800' 
-                                                                    : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-blue-400 dark:hover:border-blue-500'
-                                                                }`}
-                                                            >
-                                                                <span className={`text-sm font-medium ${isChecked ? 'text-blue-700 dark:text-blue-300' : 'text-slate-600 dark:text-slate-400'}`}>
-                                                                    {currentT.routine[item.labelKey]}
-                                                                </span>
-                                                                {isChecked ? (
-                                                                    <CheckCircle2 className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                                                                ) : (
-                                                                    <Circle className="w-5 h-5 text-slate-300 dark:text-slate-600" />
-                                                                )}
+                                                            <button key={item.id} onClick={() => toggleRoutineItem(item.id)} className={`w-full flex items-center justify-between p-3 rounded-lg border transition-all duration-200 ${isChecked ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-blue-400 dark:hover:border-blue-500'}`}>
+                                                                <span className={`text-sm font-medium ${isChecked ? 'text-blue-700 dark:text-blue-300' : 'text-slate-600 dark:text-slate-400'}`}>{currentT.routine[item.labelKey]}</span>
+                                                                {isChecked ? (<CheckCircle2 className="w-5 h-5 text-blue-600 dark:text-blue-400" />) : (<Circle className="w-5 h-5 text-slate-300 dark:text-slate-600" />)}
                                                             </button>
                                                         );
                                                     })}
                                                 </div>
                                             </div>
-                                        );
-                                    })}
-                                </div>
+                                        </div>
+
+                                        {/* Masonry Layout for the rest */}
+                                        <div className="columns-1 md:columns-2 gap-6 space-y-6">
+                                            {routineStructure.filter(s => s.id !== 'misc').map((section) => {
+                                                const serverDateObj = getServerDateObj(new Date(), timeZoneOffset);
+                                                const currentMs = serverDateObj.getTime();
+                                                const isSunday = serverDateObj.getUTCDay() === 0;
+
+                                                const msPerWeek = 604800000;
+                                                const anchor = new Date('2025-01-12T00:00:00Z').getTime();
+                                                
+                                                const diff = currentMs - anchor;
+                                                const weeksPassed = Math.floor(diff / msPerWeek);
+                                                const isBiWeekly = Math.abs(weeksPassed) % 2 === 0; 
+                                                
+                                                const isClubSection = section.id === 'club';
+                                                
+                                                const isLocked = isClubSection && isSunday && !isBiWeekly; 
+                                                const showReward = isClubSection && isBiWeekly && isSunday; 
+                                                
+                                                const allChecked = section.items.length > 0 && section.items.every(i => routineState[i.id]);
+
+                                                return (
+                                                    <div key={section.id} className={`break-inside-avoid bg-slate-50 dark:bg-slate-900/50 rounded-xl p-5 border ${showReward ? 'border-blue-500 dark:border-blue-500/50 shadow-md shadow-blue-500/10' : 'border-slate-200 dark:border-slate-700/50'} ${isLocked ? 'opacity-60 grayscale' : ''} relative overflow-hidden group`}>
+                                                        
+                                                        <div className="flex items-center justify-between gap-2 mb-4 pb-2 border-b border-slate-200 dark:border-slate-700/50">
+                                                            <div className="flex items-center gap-2">
+                                                                <h3 className="font-bold text-slate-700 dark:text-slate-200">
+                                                                    {currentT.routine[section.titleKey]}
+                                                                    {isLocked && <span className="ml-2 text-xs text-red-500 uppercase font-bold">{currentT.routine.clubClosed}</span>}
+                                                                </h3>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Reward Overlay - Replaces options area */}
+                                                        {showReward ? (
+                                                            <div className="flex flex-col items-center justify-center py-6 text-center animate-in fade-in zoom-in-95 duration-300 mt-2">
+                                                                <Gift className="w-12 h-12 text-blue-500 mb-3 animate-bounce" />
+                                                                <h4 className="text-xl font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest">{currentT.routine.rewardAvailableDay}</h4>
+                                                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">{currentT.routine.claimRewardHint}</p>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="relative">
+                                                                {/* Completed Overlay */}
+                                                                {allChecked && !isLocked && (
+                                                                    <div className="absolute inset-0 z-10 bg-green-100/90 dark:bg-green-900/90 rounded-lg flex flex-row items-center justify-center gap-2 opacity-100 group-hover:opacity-0 group-hover:pointer-events-none transition-opacity duration-300">
+                                                                        <CheckCircle2 className="w-6 h-6 text-green-600 dark:text-green-400" />
+                                                                        <span className="text-xl font-bold text-green-700 dark:text-green-300 tracking-wider">{currentT.routine.completed}</span>
+                                                                    </div>
+                                                                )}
+                                                                <div className="space-y-3">
+                                                                    {section.items.map((item) => {
+                                                                        const isChecked = routineState[item.id] || false;
+                                                                        return (
+                                                                            <button key={item.id} onClick={() => !isLocked && toggleRoutineItem(item.id)} disabled={isLocked} className={`w-full flex items-center justify-between p-3 rounded-lg border transition-all duration-200 ${isLocked ? 'bg-slate-100 dark:bg-slate-800/50 border-slate-200 dark:border-slate-800 cursor-not-allowed' : isChecked ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-blue-400 dark:hover:border-blue-500'}`}>
+                                                                                <span className={`text-sm font-medium ${isChecked ? 'text-blue-700 dark:text-blue-300' : 'text-slate-600 dark:text-slate-400'}`}>
+                                                                                    {currentT.routine[item.labelKey]} 
+                                                                                </span>
+                                                                                {isLocked ? (<Lock className="w-4 h-4 text-slate-400" />) : isChecked ? (<CheckCircle2 className="w-5 h-5 text-blue-600 dark:text-blue-400" />) : (<Circle className="w-5 h-5 text-slate-300 dark:text-slate-600" />)}
+                                                                            </button>
+                                                                        );
+                                                                    })}
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
                             </section>
-
                         </div>
-
-                        <div className="absolute bottom-4 w-full text-center text-[10px] text-slate-500 dark:text-slate-600 pointer-events-none font-noto">
-                            {currentT.copyright}
-                        </div>
+                        <div className="absolute bottom-4 w-full text-center text-[10px] text-slate-500 dark:text-slate-600 pointer-events-none font-noto">{currentT.copyright}</div>
                     </div>
                 </div>
             );
